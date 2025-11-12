@@ -1,4 +1,4 @@
-﻿package com.example.disastermanagement.repository;
+package com.example.disastermanagement.repository;
 
 import com.example.disastermanagement.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;

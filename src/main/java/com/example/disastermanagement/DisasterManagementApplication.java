@@ -1,4 +1,4 @@
-﻿package com.example.disastermanagement.disaster_management;
+package com.example.disastermanagement;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

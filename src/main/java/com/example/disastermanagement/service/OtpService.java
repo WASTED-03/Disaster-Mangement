@@ -1,4 +1,4 @@
-﻿package com.example.disastermanagement.service;
+package com.example.disastermanagement.service;
 
 import com.example.disastermanagement.model.OtpToken;
 import com.example.disastermanagement.repository.OtpTokenRepository;

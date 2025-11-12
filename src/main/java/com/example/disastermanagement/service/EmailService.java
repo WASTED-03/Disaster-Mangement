@@ -1,4 +1,4 @@
-﻿package com.example.disastermanagement.service;
+package com.example.disastermanagement.service;
 
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
