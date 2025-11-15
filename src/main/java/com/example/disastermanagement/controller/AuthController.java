@@ -1,5 +1,6 @@
 package com.example.disastermanagement.controller;
 
+import com.example.disastermanagement.config.JwtUtil;
 import com.example.disastermanagement.model.User;
 import com.example.disastermanagement.repository.UserRepository;
 import com.example.disastermanagement.service.OtpService;
@@ -14,10 +15,12 @@ public class AuthController {
 
     private final UserRepository userRepo;
     private final OtpService otpService;
+    private final JwtUtil jwtUtil;
 
-    public AuthController(UserRepository userRepo, OtpService otpService) {
+    public AuthController(UserRepository userRepo, OtpService otpService, JwtUtil jwtUtil) {
         this.userRepo = userRepo;
         this.otpService = otpService;
+        this.jwtUtil = jwtUtil;
     }
 
     @PostMapping("/register")
@@ -58,6 +61,7 @@ public class AuthController {
         boolean ok = otpService.verifyOtp(email, otp);
         if (!ok) return ResponseEntity.badRequest().body(Map.of("error", "Invalid or expired OTP"));
 
-        return ResponseEntity.ok(Map.of("message", "OTP verified successfully"));
+        String token = jwtUtil.generateToken(email);
+        return ResponseEntity.ok(Map.of("message", "OTP verified successfully", "token", token));
     }
 }

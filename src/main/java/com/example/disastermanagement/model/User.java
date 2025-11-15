@@ -29,5 +29,6 @@ public class User {
     @Column(name = "role")
     private Set<String> roles;
 
+    @Builder.Default
     private boolean enabled = true;
 }
