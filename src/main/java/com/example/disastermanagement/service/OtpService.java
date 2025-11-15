@@ -38,6 +38,8 @@ public class OtpService {
         OtpToken token = opt.get();
         if (token.getExpiresAt().isBefore(LocalDateTime.now())) return false;
         if (!token.getOtp().equals(otp)) return false;
+        
+        // Update the existing token to mark it as used
         token.setUsed(true);
         otpRepo.save(token);
         return true;

@@ -33,10 +33,11 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", "Email already registered"));
         }
 
-        User user = new User();
-        user.setName(name);
-        user.setEmail(email);
-        user.setPassword(password); // (We’ll hash later)
+        User user = User.builder()
+                .name(name)
+                .email(email)
+                .password(password) // (We'll hash later)
+                .build();
         userRepo.save(user);
 
         return ResponseEntity.ok(Map.of("message", "User registered successfully"));
