@@ -6,22 +6,22 @@ import java.time.LocalDateTime;
 
 @Entity
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class SosRequest {
+public class DisasterReport {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String email;
-
-    private String message;
+    private String userEmail;      // User who reported
+    private String type;           // fire, flood, accident, etc.
+    private String description;
 
     private double latitude;
-
     private double longitude;
 
-    private LocalDateTime timestamp;   // <--- REQUIRED FIELD
+    private String severity;       // low, medium, high
+    private LocalDateTime timestamp;
 }
