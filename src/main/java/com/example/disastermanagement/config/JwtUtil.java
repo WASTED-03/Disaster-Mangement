@@ -9,6 +9,7 @@ import java.security.Key;
 import java.util.Date;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Set;
 import java.util.function.Function;
 
 @Component
@@ -34,10 +35,17 @@ public class JwtUtil {
                 .getBody();
     }
 
-    public String generateToken(String username) {
-        Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, username);
-    }
+	public String generateToken(String username) {
+		return generateToken(username, Set.of());
+	}
+
+	public String generateToken(String username, Set<String> roles) {
+		Map<String, Object> claims = new HashMap<>();
+		if (roles != null && !roles.isEmpty()) {
+			claims.put("roles", roles);
+		}
+		return createToken(claims, username);
+	}
 
     private String createToken(Map<String, Object> claims, String subject) {
         long now = System.currentTimeMillis();

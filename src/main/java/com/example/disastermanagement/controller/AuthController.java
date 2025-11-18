@@ -79,7 +79,17 @@ public class AuthController {
             }
         });
 
-        String token = jwtUtil.generateToken(email);
-        return ResponseEntity.ok(Map.of("message", "OTP verified successfully", "token", token));
+        User user = userRepo.findByEmail(email).get();
+
+        String token = jwtUtil.generateToken(
+        user.getEmail(),
+        user.getRoles()
+        );
+
+    return ResponseEntity.ok(Map.of(
+        "message", "OTP verified successfully",
+        "token", token
+));
+
     }
 }
