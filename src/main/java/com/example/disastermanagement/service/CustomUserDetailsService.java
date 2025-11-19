@@ -3,36 +3,33 @@ package com.example.disastermanagement.service;
 import com.example.disastermanagement.model.User;
 import com.example.disastermanagement.repository.UserRepository;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.core.userdetails.*;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
 
-    private final UserRepository userRepo;
+    private final UserRepository repo;
 
-    public CustomUserDetailsService(UserRepository userRepo) {
-        this.userRepo = userRepo;
+    public CustomUserDetailsService(UserRepository repo) {
+        this.repo = repo;
     }
 
     @Override
-    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        User user = userRepo.findByEmail(email)
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        User u = repo.findByEmail(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
-
-        List<SimpleGrantedAuthority> authorities = user.getRoles().stream()
+        var authorities = u.getRoleSet().stream()
                 .map(SimpleGrantedAuthority::new)
                 .collect(Collectors.toList());
 
-        return new org.springframework.security.core.userdetails.User(
-                user.getEmail(),
-                user.getPassword(),
-                authorities
-        );
+        return org.springframework.security.core.userdetails.User.builder()
+                .username(u.getEmail())
+                .password(u.getPassword())
+                .authorities(authorities)
+                .accountLocked(!u.isEnabled())
+                .build();
     }
 }

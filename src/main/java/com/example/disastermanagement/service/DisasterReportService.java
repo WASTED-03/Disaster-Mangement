@@ -10,22 +10,22 @@ import java.util.List;
 @Service
 public class DisasterReportService {
 
-    private final DisasterReportRepository repository;
+    private final DisasterReportRepository repo;
 
-    public DisasterReportService(DisasterReportRepository repository) {
-        this.repository = repository;
+    public DisasterReportService(DisasterReportRepository repo) {
+        this.repo = repo;
     }
 
-    public DisasterReport createReport(DisasterReport report) {
-        report.setTimestamp(LocalDateTime.now());
-        return repository.save(report);
+    public DisasterReport createReport(DisasterReport r) {
+        r.setTimestamp(LocalDateTime.now());
+        return repo.save(r);
     }
 
-    public List<DisasterReport> getUserReports(String email) {
-        return repository.findByUserEmail(email);
+    public List<DisasterReport> getAll() {
+        return repo.findAll();
     }
 
-    public List<DisasterReport> getAllReports() {
-        return repository.findAll();
+    public List<DisasterReport> getByUser(String email) {
+        return repo.findByUserEmail(email);
     }
 }

@@ -1,9 +1,9 @@
 package com.example.disastermanagement.controller;
 
-import com.example.disastermanagement.config.JwtUtil;
 import com.example.disastermanagement.model.SosRequest;
 import com.example.disastermanagement.service.SosService;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.example.disastermanagement.config.JwtUtil;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -12,21 +12,27 @@ import java.util.List;
 @RequestMapping("/sos")
 public class SosController {
 
-    @Autowired
-    private SosService sosService;
+    private final SosService sosService;
+    private final JwtUtil jwtUtil;
 
-    @Autowired
-    private JwtUtil jwtUtil;
-
-    @PostMapping("/send")
-    public String sendSos(@RequestBody SosRequest sosRequest) {
-        sosService.createSos(sosRequest);
-        return "SOS Alert Sent Successfully!";
+    public SosController(SosService sosService, JwtUtil jwtUtil) {
+        this.sosService = sosService;
+        this.jwtUtil = jwtUtil;
     }
-    @GetMapping("/my")
-public List<SosRequest> getMySos(@RequestHeader("Authorization") String token) {
-    String email = jwtUtil.extractUsername(token.substring(7));
-    return sosService.getByEmail(email);
-}
 
+    @PostMapping("/create")
+    public ResponseEntity<?> createSos(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody SosRequest sos
+    ) {
+        String token = authHeader.substring(7);
+        String email = jwtUtil.extractUsername(token);
+        sos.setUserEmail(email);
+        return ResponseEntity.ok(sosService.createSos(sos));
+    }
+
+    @GetMapping("/list")
+    public ResponseEntity<List<SosRequest>> listAll() {
+        return ResponseEntity.ok(sosService.getAll());
+    }
 }

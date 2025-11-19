@@ -1,69 +1,74 @@
 package com.example.disastermanagement.config;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
-import java.util.Date;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.Set;
-import java.util.function.Function;
+import java.util.*;
 
 @Component
 public class JwtUtil {
 
-    // Use environment variable in production; for dev this in-memory key is ok.
-    private final Key key = Keys.secretKeyFor(io.jsonwebtoken.SignatureAlgorithm.HS256);
+    // Use a long random string in production and keep secret in env vars
+    private static final String SECRET = "replace_with_a_very_long_random_secret_key_please_change";
 
-    public String extractUsername(String token) {
-        return extractClaim(token, Claims::getSubject);
+    private Key getSigningKey() {
+        byte[] keyBytes = Decoders.BASE64.decode(Base64.getEncoder().encodeToString(SECRET.getBytes()));
+        return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
-        final Claims claims = extractAllClaims(token);
-        return claimsResolver.apply(claims);
-    }
-
-    private Claims extractAllClaims(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(key)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-    }
-
-	public String generateToken(String username) {
-		return generateToken(username, Set.of());
-	}
-
-	public String generateToken(String username, Set<String> roles) {
-		Map<String, Object> claims = new HashMap<>();
-		if (roles != null && !roles.isEmpty()) {
-			claims.put("roles", roles);
-		}
-		return createToken(claims, username);
-	}
-
-    private String createToken(Map<String, Object> claims, String subject) {
-        long now = System.currentTimeMillis();
+    public String generateToken(String email, Set<String> roles) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("roles", roles);
+        Date now = new Date();
+        Date exp = new Date(System.currentTimeMillis() + 3600_000); // 1 hour
         return Jwts.builder()
                 .setClaims(claims)
-                .setSubject(subject)
-                .setIssuedAt(new Date(now))
-                .setExpiration(new Date(now + 1000L * 60 * 60 * 10)) // 10 hours
-                .signWith(key)
+                .setSubject(email)
+                .setIssuedAt(now)
+                .setExpiration(exp)
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
+    public String extractUsername(String token) {
+        return parseClaims(token).getSubject();
+    }
+
+    public List<String> extractRolesList(String token) {
+        Object rolesObj = parseClaims(token).get("roles");
+        if (rolesObj instanceof List) {
+            return (List<String>) rolesObj;
+        }
+        return Collections.emptyList();
+    }
+
+    // convenience: returns as List<String>
+    public List<String> extractRoles(String token) {
+        return extractRolesList(token);
+    }
+
     public boolean validateToken(String token, String username) {
-        final String extracted = extractUsername(token);
-        return (extracted.equals(username) && !isTokenExpired(token));
+        try {
+            final String sub = extractUsername(token);
+            return (sub.equals(username) && !isTokenExpired(token));
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private boolean isTokenExpired(String token) {
-        return extractClaim(token, Claims::getExpiration).before(new Date());
+        Date exp = parseClaims(token).getExpiration();
+        return exp.before(new Date());
+    }
+
+    private Claims parseClaims(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
     }
 }

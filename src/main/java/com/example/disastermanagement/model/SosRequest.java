@@ -2,26 +2,23 @@ package com.example.disastermanagement.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class SosRequest {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String email;
-
-    private String message;
-
+    private String userEmail;
     private double latitude;
-
     private double longitude;
-
-    private LocalDateTime timestamp;   // <--- REQUIRED FIELD
+    private String message;
+    private LocalDateTime timestamp;
 }

@@ -2,6 +2,7 @@ package com.example.disastermanagement.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -15,13 +16,11 @@ public class DisasterReport {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String userEmail;      // User who reported
-    private String type;           // fire, flood, accident, etc.
+    private String userEmail;
+    private String type;
     private String description;
-
     private double latitude;
     private double longitude;
-
-    private String severity;       // low, medium, high
+    private String severity;
     private LocalDateTime timestamp;
 }
