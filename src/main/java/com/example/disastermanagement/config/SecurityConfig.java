@@ -31,6 +31,7 @@ public class SecurityConfig {
                         // USER SOS ENDPOINTS
                         .requestMatchers("/sos/create").hasAnyAuthority("USER", "ADMIN")
                         .requestMatchers("/sos/my").hasAnyAuthority("USER", "ADMIN")
+                        .requestMatchers("/report/create").hasAnyAuthority("USER", "ADMIN")
 
                         // ADMIN PROMOTION (authenticated users can request promotion)
                         .requestMatchers("/admin/promote").authenticated()

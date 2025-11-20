@@ -6,7 +6,8 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -20,5 +21,12 @@ public class SosRequest {
     private double latitude;
     private double longitude;
     private String message;
+    private String type;
+
+    @Builder.Default
+    private String status = "PENDING";
+
     private LocalDateTime timestamp;
+
+    private Long assignedTeamId;
 }

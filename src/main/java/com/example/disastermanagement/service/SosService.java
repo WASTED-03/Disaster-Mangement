@@ -3,9 +3,12 @@ package com.example.disastermanagement.service;
 import com.example.disastermanagement.model.SosRequest;
 import com.example.disastermanagement.repository.SosRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class SosService {
@@ -18,6 +21,9 @@ public class SosService {
 
     public SosRequest createSos(SosRequest sos) {
         sos.setTimestamp(LocalDateTime.now());
+        if (!StringUtils.hasText(sos.getStatus())) {
+            sos.setStatus("PENDING");
+        }
         return repo.save(sos);
     }
 
@@ -25,11 +31,93 @@ public class SosService {
         return repo.findAll();
     }
 
-    public List<SosRequest> getByEmail(String email) {
-        return repo.findByUserEmail(email);
+    public List<SosRequest> search(String email, LocalDate start, LocalDate end) {
+        boolean hasEmail = StringUtils.hasText(email);
+        boolean hasStart = start != null;
+        boolean hasEnd = end != null;
+
+        if (!hasEmail && !hasStart && !hasEnd) {
+            return repo.findAll();
+        }
+
+        LocalDateTime startDt = null;
+        LocalDateTime endDt = null;
+        if (hasStart) {
+            startDt = Objects.requireNonNull(start).atStartOfDay();
+        }
+        if (hasEnd) {
+            endDt = Objects.requireNonNull(end).plusDays(1).atStartOfDay().minusNanos(1);
+        }
+
+        if ((hasStart && !hasEnd) || (!hasStart && hasEnd)) {
+            throw new IllegalArgumentException("Both start and end dates are required for date filtering");
+        }
+
+        if (hasEmail && hasStart && hasEnd) {
+            if (startDt == null || endDt == null) {
+                throw new IllegalArgumentException("Start and end dates are required");
+            }
+            return repo.findByUserEmailAndTimestampBetween(email, startDt, endDt);
+        }
+
+        if (hasEmail) {
+            return repo.findByUserEmail(email);
+        }
+
+        if (startDt == null || endDt == null) {
+            throw new IllegalArgumentException("Start and end dates are required");
+        }
+        return repo.findByTimestampBetween(startDt, endDt);
     }
 
-    public List<SosRequest> getByDate(LocalDateTime start, LocalDateTime end) {
-        return repo.findByTimestampBetween(start, end);
+    public SosRequest markInProgress(long id) {
+        return updateStatus(id, "IN_PROGRESS");
     }
+
+    public SosRequest markResolved(long id) {
+        return updateStatus(id, "RESOLVED");
+    }
+
+    private SosRequest updateStatus(long id, String status) {
+        SosRequest sos = repo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("SOS not found"));
+        sos.setStatus(status);
+        return repo.save(sos);
+    }
+
+    public SosRequest assignTeam(long sosId, long teamId) {
+        SosRequest sos = repo.findById(sosId)
+                .orElseThrow(() -> new IllegalArgumentException("SOS not found"));
+        sos.setAssignedTeamId(teamId);
+        if (!"RESOLVED".equalsIgnoreCase(sos.getStatus())) {
+            sos.setStatus("IN_PROGRESS");
+        }
+        return repo.save(sos);
+    }
+
+    public StatusSummary statusSummary() {
+        long total = repo.count();
+        long pending = repo.countByStatus("PENDING");
+        long inProgress = repo.countByStatus("IN_PROGRESS");
+        long resolved = repo.countByStatus("RESOLVED");
+        return new StatusSummary(total, pending, inProgress, resolved);
+    }
+
+    public DailySummary dailySummary() {
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        LocalDateTime now = LocalDateTime.now();
+        long today = repo.countByTimestampBetween(todayStart, now);
+
+        LocalDateTime sevenDaysAgo = now.minusDays(7);
+        long last7 = repo.countByTimestampBetween(sevenDaysAgo, now);
+        return new DailySummary(today, last7);
+    }
+
+    public List<SosRepository.TypeCount> typeSummary() {
+        return repo.countByType();
+    }
+
+    public record StatusSummary(long total, long pending, long inProgress, long resolved) {}
+
+    public record DailySummary(long today, long last7Days) {}
 }

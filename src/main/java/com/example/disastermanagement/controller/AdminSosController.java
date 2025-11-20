@@ -1,40 +1,53 @@
 package com.example.disastermanagement.controller;
 
 import com.example.disastermanagement.model.SosRequest;
+import com.example.disastermanagement.service.RescueTeamService;
 import com.example.disastermanagement.service.SosService;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
 @RequestMapping("/admin/sos")
 public class AdminSosController {
 
-    @Autowired
-    private SosService sosService;
+    private final SosService sosService;
+    private final RescueTeamService rescueTeamService;
 
-    // Get all SOS alerts
+    public AdminSosController(SosService sosService, RescueTeamService rescueTeamService) {
+        this.sosService = sosService;
+        this.rescueTeamService = rescueTeamService;
+    }
+
+    @GetMapping
+    public List<SosRequest> list(
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end
+    ) {
+        return sosService.search(email, start, end);
+    }
+
     @GetMapping("/all")
     public List<SosRequest> getAllSos() {
         return sosService.getAll();
     }
 
-    // Filter by user email
-    @GetMapping("/by-email")
-    public List<SosRequest> getByEmail(@RequestParam String email) {
-        return sosService.getByEmail(email);
+    @PatchMapping("/{id}/start")
+    public SosRequest markInProgress(@PathVariable long id) {
+        return sosService.markInProgress(id);
     }
 
-    // Filter by date: format YYYY-MM-DD
-    @GetMapping("/by-date")
-    public List<SosRequest> getByDate(@RequestParam String date) {
-        LocalDate d = LocalDate.parse(date);
-        LocalDateTime start = d.atStartOfDay();
-        LocalDateTime end = d.atTime(23,59,59);
+    @PatchMapping("/{id}/resolve")
+    public SosRequest markResolved(@PathVariable long id) {
+        return sosService.markResolved(id);
+    }
 
-        return sosService.getByDate(start, end);
+    @PostMapping("/{id}/assign/{teamId}")
+    public SosRequest assignTeam(@PathVariable long id, @PathVariable long teamId) {
+        rescueTeamService.updateAvailability(teamId, false);
+        return sosService.assignTeam(id, teamId);
     }
 }

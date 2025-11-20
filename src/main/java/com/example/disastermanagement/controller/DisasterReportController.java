@@ -1,12 +1,14 @@
 package com.example.disastermanagement.controller;
 
+import com.example.disastermanagement.config.JwtUtil;
 import com.example.disastermanagement.model.DisasterReport;
 import com.example.disastermanagement.service.DisasterReportService;
-import com.example.disastermanagement.config.JwtUtil;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/report")
@@ -23,10 +25,14 @@ public class DisasterReportController {
     @PostMapping("/create")
     public ResponseEntity<?> createReport(@RequestHeader("Authorization") String authHeader,
                                           @RequestBody DisasterReport report) {
+        validate(report);
         String token = authHeader.substring(7);
         String email = jwtUtil.extractUsername(token);
-        report.setUserEmail(email);
-        return ResponseEntity.ok(service.createReport(report));
+        DisasterReport saved = service.createReport(report, email);
+        return ResponseEntity.ok(Map.of(
+                "message", "Report submitted",
+                "reportId", saved.getId()
+        ));
     }
 
     @GetMapping("/my-reports")
@@ -38,5 +44,17 @@ public class DisasterReportController {
     @GetMapping("/all")
     public ResponseEntity<List<DisasterReport>> all() {
         return ResponseEntity.ok(service.getAll());
+    }
+
+    private void validate(DisasterReport report) {
+        if (!StringUtils.hasText(report.getType())) {
+            throw new IllegalArgumentException("type is required");
+        }
+        if (!StringUtils.hasText(report.getDescription())) {
+            throw new IllegalArgumentException("description is required");
+        }
+        if (report.getSeverity() == null) {
+            throw new IllegalArgumentException("severity is required");
+        }
     }
 }

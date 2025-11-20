@@ -32,7 +32,9 @@ public class User {
     @Column(length = 500)
     private String roles;
 
+    @Builder.Default
     private boolean enabled = true;
+    @Builder.Default
     private boolean verified = false;
 
     public Set<String> getRoleSet() {
@@ -45,6 +47,12 @@ public class User {
     public void addRole(String role) {
         Set<String> s = getRoleSet();
         s.add(role);
+        this.roles = String.join(",", s);
+    }
+
+    public void removeRole(String role) {
+        Set<String> s = getRoleSet();
+        s.remove(role);
         this.roles = String.join(",", s);
     }
 }

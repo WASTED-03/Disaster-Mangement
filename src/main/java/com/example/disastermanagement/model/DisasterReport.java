@@ -6,7 +6,8 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -22,5 +23,10 @@ public class DisasterReport {
     private double latitude;
     private double longitude;
     private String severity;
+
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private ReportStatus status = ReportStatus.PENDING;
+
     private LocalDateTime timestamp;
 }
