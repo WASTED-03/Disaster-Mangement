@@ -2,6 +2,7 @@ package com.example.disastermanagement.controller;
 
 import com.example.disastermanagement.config.JwtUtil;
 import com.example.disastermanagement.model.DisasterReport;
+import com.example.disastermanagement.model.ReportStatus;
 import com.example.disastermanagement.service.DisasterReportService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
@@ -11,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/report")
+@RequestMapping("/reports")
 public class DisasterReportController {
 
     private final DisasterReportService service;
@@ -35,10 +36,54 @@ public class DisasterReportController {
         ));
     }
 
-    @GetMapping("/my-reports")
-    public ResponseEntity<List<DisasterReport>> myReports(@RequestHeader("Authorization") String authHeader) {
-        String email = jwtUtil.extractUsername(authHeader.substring(7));
-        return ResponseEntity.ok(service.getByUser(email));
+    @GetMapping("/my")
+    public ResponseEntity<List<DisasterReport>> myReports(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestParam(required = false) String status) {
+        String token = authHeader.substring(7);
+        String email = jwtUtil.extractUsername(token);
+        
+        ReportStatus reportStatus = null;
+        if (StringUtils.hasText(status)) {
+            try {
+                reportStatus = ReportStatus.valueOf(status.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Invalid status. Must be PENDING, APPROVED, REJECTED, or RESOLVED");
+            }
+        }
+        
+        return ResponseEntity.ok(service.getMyReports(email, reportStatus));
+    }
+
+    @GetMapping("/my/summary")
+    public ResponseEntity<Map<String, Long>> mySummary(@RequestHeader("Authorization") String authHeader) {
+        String token = authHeader.substring(7);
+        String email = jwtUtil.extractUsername(token);
+        return ResponseEntity.ok(service.getSummary(email));
+    }
+
+    @PutMapping("/{id}/edit")
+    public ResponseEntity<?> editReport(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable Long id,
+            @RequestBody DisasterReport updates) {
+        String token = authHeader.substring(7);
+        String email = jwtUtil.extractUsername(token);
+        DisasterReport updated = service.editReport(id, email, updates);
+        return ResponseEntity.ok(Map.of(
+                "message", "Report updated successfully",
+                "reportId", updated.getId()
+        ));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteReport(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable Long id) {
+        String token = authHeader.substring(7);
+        String email = jwtUtil.extractUsername(token);
+        service.deleteReport(id, email);
+        return ResponseEntity.ok(Map.of("message", "Report deleted successfully"));
     }
 
     @GetMapping("/all")

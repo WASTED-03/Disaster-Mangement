@@ -27,11 +27,18 @@ public class SecurityConfig {
                         // PUBLIC
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/debug/public").permitAll()
+                        .requestMatchers("/alerts/latest").permitAll()
+                        .requestMatchers("/alerts/near").permitAll()
+                        .requestMatchers("/resources/**").permitAll()
 
                         // USER SOS ENDPOINTS
                         .requestMatchers("/sos/create").hasAnyAuthority("USER", "ADMIN")
                         .requestMatchers("/sos/my").hasAnyAuthority("USER", "ADMIN")
-                        .requestMatchers("/report/create").hasAnyAuthority("USER", "ADMIN")
+                        // USER REPORT ENDPOINTS
+                        .requestMatchers("/reports/create").hasAnyAuthority("USER", "ADMIN")
+                        .requestMatchers("/reports/my/**").hasAnyAuthority("USER", "ADMIN")
+                        .requestMatchers("/reports/{id}/edit").hasAnyAuthority("USER", "ADMIN")
+                        .requestMatchers("/reports/{id}").hasAnyAuthority("USER", "ADMIN")
 
                         // ADMIN PROMOTION (authenticated users can request promotion)
                         .requestMatchers("/admin/promote").authenticated()
