@@ -42,6 +42,8 @@ public class SecurityConfig {
                         .requestMatchers("/reports/my/**").hasAnyAuthority("USER", "ADMIN")
                         .requestMatchers("/reports/{id}/edit").hasAnyAuthority("USER", "ADMIN")
                         .requestMatchers("/reports/{id}").hasAnyAuthority("USER", "ADMIN")
+                        // USER LOCATION ENDPOINTS
+                        .requestMatchers("/user/update-location").hasAnyAuthority("USER", "ADMIN")
 
                         // ADMIN PROMOTION (authenticated users can request promotion)
                         .requestMatchers("/admin/promote").authenticated()

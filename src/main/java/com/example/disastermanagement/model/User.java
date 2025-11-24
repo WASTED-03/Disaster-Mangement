@@ -37,6 +37,10 @@ public class User {
     @Builder.Default
     private boolean verified = false;
 
+    // Location fields for location-based alerts
+    private Double latitude;
+    private Double longitude;
+
     public Set<String> getRoleSet() {
         if (roles == null || roles.isBlank()) return Collections.emptySet();
         return Arrays.stream(roles.split(","))
