@@ -1,67 +1,57 @@
 package com.example.disastermanagement.controller;
 
-import com.example.disastermanagement.model.WeatherData;
-import com.example.disastermanagement.service.AlertRulesService;
-import com.example.disastermanagement.service.WeatherAlertService;
+import com.example.disastermanagement.model.WeatherAlert;
+import com.example.disastermanagement.repository.WeatherAlertRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 /**
- * Controller for weather-based disaster alert APIs.
- * This controller exposes endpoints to fetch weather data and generate alerts.
+ * Controller for managing weather alerts stored in the database.
  */
 @RestController
-@RequestMapping("/weather")
+@RequestMapping("/alerts")
 public class WeatherAlertController {
 
-    private final WeatherAlertService weatherAlertService;
-    private final AlertRulesService alertRulesService;
+    private final WeatherAlertRepository weatherAlertRepository;
 
-    public WeatherAlertController(WeatherAlertService weatherAlertService, 
-                                  AlertRulesService alertRulesService) {
-        this.weatherAlertService = weatherAlertService;
-        this.alertRulesService = alertRulesService;
+    public WeatherAlertController(WeatherAlertRepository weatherAlertRepository) {
+        this.weatherAlertRepository = weatherAlertRepository;
     }
 
     /**
-     * B. Endpoint for fetching weather alerts based on location
+     * A. Get all weather alerts (Admin only)
      * 
-     * This endpoint accepts latitude and longitude as query parameters,
-     * fetches and parses weather data, applies alert rules, and returns
-     * both weather data and alerts.
+     * Returns all alerts from the database, ordered by timestamp descending.
      * 
-     * @param lat Latitude coordinate
-     * @param lon Longitude coordinate
-     * @return Response containing weather data and list of alerts
+     * @return List of all weather alerts
      */
-    @GetMapping("/alert")
-    public ResponseEntity<?> getWeatherAlert(
-            @RequestParam double lat,
-            @RequestParam double lon) {
+    @GetMapping("/all")
+    public ResponseEntity<List<WeatherAlert>> getAllAlerts() {
+        List<WeatherAlert> alerts = weatherAlertRepository.findAllByOrderByTimestampDesc();
+        return ResponseEntity.ok(alerts);
+    }
+
+    /**
+     * B. Get recent weather alerts (User accessible)
+     * 
+     * Returns alerts from the last N hours, ordered by timestamp descending.
+     * 
+     * @param hours Number of hours to look back (default: 6)
+     * @return List of recent weather alerts
+     */
+    @GetMapping("/recent")
+    public ResponseEntity<List<WeatherAlert>> getRecentAlerts(
+            @RequestParam(defaultValue = "6") int hours) {
         
-        // Step 1: Fetch and parse weather data from OpenWeather API
-        System.out.println("DEBUG: Fetching weather for lat=" + lat + ", lon=" + lon);
-        WeatherData weatherData = null;
-        try {
-            weatherData = weatherAlertService.fetchWeather(lat, lon);
-            System.out.println("DEBUG: Weather data fetched and parsed successfully");
-        } catch (Exception e) {
-            System.out.println("DEBUG: Error fetching weather: " + e.getMessage());
-            throw e; // Re-throw to return error response
-        }
+        // Calculate timestamp for N hours ago
+        LocalDateTime cutoffTime = LocalDateTime.now().minusHours(hours);
         
-        // Step 2: Analyze weather data using alert rules
-        List<String> alerts = alertRulesService.analyzeAlerts(weatherData);
-        System.out.println("DEBUG: Alerts generated: " + alerts);
+        // Fetch alerts after the cutoff time
+        List<WeatherAlert> alerts = weatherAlertRepository.findByTimestampAfterOrderByTimestampDesc(cutoffTime);
         
-        // Return response with weather data and alerts
-        return ResponseEntity.ok(Map.of(
-                "weather", weatherData,
-                "alerts", alerts
-        ));
+        return ResponseEntity.ok(alerts);
     }
 }
-

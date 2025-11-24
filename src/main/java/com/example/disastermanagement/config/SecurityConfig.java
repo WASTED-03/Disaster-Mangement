@@ -30,6 +30,7 @@ public class SecurityConfig {
                         .requestMatchers("/debug/public").permitAll()
                         .requestMatchers("/alerts/latest").permitAll()
                         .requestMatchers("/alerts/near").permitAll()
+                        .requestMatchers("/alerts/recent").permitAll() // User accessible - recent alerts
                         .requestMatchers("/resources/**").permitAll()
                         .requestMatchers("/weather/**").permitAll()
 
@@ -47,6 +48,7 @@ public class SecurityConfig {
 
                         // ADMIN ONLY ENDPOINTS
                         .requestMatchers("/admin/users/**").hasAuthority("ADMIN")
+                        .requestMatchers("/alerts/all").hasAuthority("ADMIN") // Admin only - all alerts
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
 
 
