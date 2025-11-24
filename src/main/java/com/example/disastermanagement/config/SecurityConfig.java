@@ -10,6 +10,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.client.RestTemplate;
 
 @Configuration
 public class SecurityConfig {
@@ -30,6 +31,7 @@ public class SecurityConfig {
                         .requestMatchers("/alerts/latest").permitAll()
                         .requestMatchers("/alerts/near").permitAll()
                         .requestMatchers("/resources/**").permitAll()
+                        .requestMatchers("/weather/**").permitAll()
 
                         // USER SOS ENDPOINTS
                         .requestMatchers("/sos/create").hasAnyAuthority("USER", "ADMIN")
@@ -65,5 +67,10 @@ public class SecurityConfig {
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
             throws Exception {
         return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public RestTemplate restTemplate() {
+        return new RestTemplate();
     }
 }
