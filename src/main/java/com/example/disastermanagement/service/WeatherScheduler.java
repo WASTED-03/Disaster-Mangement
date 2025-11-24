@@ -9,6 +9,7 @@ import com.example.disastermanagement.repository.SosRepository;
 import com.example.disastermanagement.repository.UserAlertRepository;
 import com.example.disastermanagement.repository.UserRepository;
 import com.example.disastermanagement.repository.WeatherAlertRepository;
+import com.example.disastermanagement.service.notification.NotificationService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +30,7 @@ public class WeatherScheduler {
     private final UserRepository userRepository;
     private final UserAlertRepository userAlertRepository;
     private final SosRepository sosRepository;
+    private final NotificationService notificationService;
 
     // Hardcoded location: Bengaluru, India
     private static final double BENGALURU_LAT = 12.97;
@@ -51,13 +53,15 @@ public class WeatherScheduler {
                            WeatherAlertRepository weatherAlertRepository,
                            UserRepository userRepository,
                            UserAlertRepository userAlertRepository,
-                           SosRepository sosRepository) {
+                           SosRepository sosRepository,
+                           NotificationService notificationService) {
         this.weatherAlertService = weatherAlertService;
         this.alertRulesService = alertRulesService;
         this.weatherAlertRepository = weatherAlertRepository;
         this.userRepository = userRepository;
         this.userAlertRepository = userAlertRepository;
         this.sosRepository = sosRepository;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -224,6 +228,18 @@ public class WeatherScheduler {
                     weatherAlert.getSeverity().toLowerCase() : "";
             boolean isHighSeverity = HIGH_SEVERITY.equals(severity) || CRITICAL_SEVERITY.equals(severity);
             
+            // STEP 12.6: Notify admins about high-severity weather alert
+            if (isHighSeverity) {
+                try {
+                    String adminMessage = String.format("High weather alert detected: %s at %s (%.4f, %.4f). Severity: %s",
+                            weatherAlert.getType().toUpperCase(), weatherAlert.getMessage(),
+                            weatherAlert.getLatitude(), weatherAlert.getLongitude(), weatherAlert.getSeverity());
+                    notificationService.notifyAdmins(adminMessage);
+                } catch (Exception e) {
+                    System.err.println("Error sending admin notification: " + e.getMessage());
+                }
+            }
+            
             for (User user : users) {
                 // Skip users without location data
                 if (user.getLatitude() == null || user.getLongitude() == null) {
@@ -249,6 +265,15 @@ public class WeatherScheduler {
                     
                     userAlertRepository.save(userAlert);
                     userAlertCount++;
+                    
+                    // STEP 12.6: Send real-time notification to user about weather alert
+                    try {
+                        String userMessage = String.format("Severe Weather Warning! %s - %s", 
+                                weatherAlert.getType().toUpperCase(), weatherAlert.getMessage());
+                        notificationService.notifyUser(user.getEmail(), userMessage);
+                    } catch (Exception e) {
+                        System.err.println("Error sending weather alert notification to user: " + e.getMessage());
+                    }
                     
                     // STEP 11B: Auto-create SOS for HIGH severity alerts
                     // STEP 11D: Check cooldown to prevent flood of SOS
