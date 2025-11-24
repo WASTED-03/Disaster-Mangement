@@ -1,9 +1,11 @@
 package com.example.disastermanagement.service;
 
+import com.example.disastermanagement.model.SosRequest;
 import com.example.disastermanagement.model.User;
 import com.example.disastermanagement.model.UserAlert;
 import com.example.disastermanagement.model.WeatherAlert;
 import com.example.disastermanagement.model.WeatherData;
+import com.example.disastermanagement.repository.SosRepository;
 import com.example.disastermanagement.repository.UserAlertRepository;
 import com.example.disastermanagement.repository.UserRepository;
 import com.example.disastermanagement.repository.WeatherAlertRepository;
@@ -26,6 +28,7 @@ public class WeatherScheduler {
     private final WeatherAlertRepository weatherAlertRepository;
     private final UserRepository userRepository;
     private final UserAlertRepository userAlertRepository;
+    private final SosRepository sosRepository;
 
     // Hardcoded location: Bengaluru, India
     private static final double BENGALURU_LAT = 12.97;
@@ -35,17 +38,23 @@ public class WeatherScheduler {
     // Distance threshold for user alerts (in kilometers)
     private static final double ALERT_DISTANCE_THRESHOLD_KM = 20.0;
     private static final double EARTH_RADIUS_KM = 6371.0;
+    
+    // Severity levels for auto-SOS trigger
+    private static final String HIGH_SEVERITY = "high";
+    private static final String CRITICAL_SEVERITY = "critical";
 
     public WeatherScheduler(WeatherAlertService weatherAlertService, 
                            AlertRulesService alertRulesService,
                            WeatherAlertRepository weatherAlertRepository,
                            UserRepository userRepository,
-                           UserAlertRepository userAlertRepository) {
+                           UserAlertRepository userAlertRepository,
+                           SosRepository sosRepository) {
         this.weatherAlertService = weatherAlertService;
         this.alertRulesService = alertRulesService;
         this.weatherAlertRepository = weatherAlertRepository;
         this.userRepository = userRepository;
         this.userAlertRepository = userAlertRepository;
+        this.sosRepository = sosRepository;
     }
 
     /**
@@ -74,6 +83,7 @@ public class WeatherScheduler {
                 
                 int savedCount = 0;
                 int userAlertCount = 0;
+                int autoSosCount = 0;
                 for (String alertType : alerts) {
                     System.out.println("  - " + alertType);
                     
@@ -83,7 +93,10 @@ public class WeatherScheduler {
                     savedCount++;
                     
                     // STEP 10E: Match alert with nearby users and save to UserAlert
-                    userAlertCount += matchAlertWithUsers(savedAlert);
+                    // STEP 11B: Also create auto-SOS for HIGH severity alerts
+                    int[] results = matchAlertWithUsers(savedAlert);
+                    userAlertCount += results[0];
+                    autoSosCount += results[1];
                 }
                 
                 System.out.println("Weather conditions: " + 
@@ -96,6 +109,9 @@ public class WeatherScheduler {
                 System.out.println("💾 Saved " + savedCount + " new alert(s) at " + saveTimestamp);
                 if (userAlertCount > 0) {
                     System.out.println("👤 Created " + userAlertCount + " user-specific alert(s) for nearby users");
+                }
+                if (autoSosCount > 0) {
+                    System.out.println("🚨 Auto-triggered " + autoSosCount + " SOS request(s) for high-severity alerts");
                 }
             } else {
                 System.out.println("[WEATHER ALERT] ✅ No threats detected at " + LOCATION_NAME + 
@@ -181,20 +197,29 @@ public class WeatherScheduler {
     }
 
     /**
-     * STEP 10E: Match weather alert with nearby users and create UserAlert entries.
+     * STEP 10E & 11B: Match weather alert with nearby users and create UserAlert entries.
+     * Also creates auto-SOS requests for HIGH severity alerts.
      * 
      * For each user with location data, calculates distance from alert location.
-     * If distance < 20km, creates a UserAlert entry for that user.
+     * If distance < 20km:
+     *   - Creates a UserAlert entry for that user
+     *   - If alert severity is HIGH or CRITICAL, also creates an auto-SOS request
      * 
      * @param weatherAlert The weather alert to match with users
-     * @return Number of user alerts created
+     * @return Array with [userAlertCount, autoSosCount]
      */
-    private int matchAlertWithUsers(WeatherAlert weatherAlert) {
+    private int[] matchAlertWithUsers(WeatherAlert weatherAlert) {
         int userAlertCount = 0;
+        int autoSosCount = 0;
         
         try {
             // Get all users from database
             List<User> users = userRepository.findAll();
+            
+            // STEP 11A: Check if alert severity is HIGH (for auto-SOS)
+            String severity = weatherAlert.getSeverity() != null ? 
+                    weatherAlert.getSeverity().toLowerCase() : "";
+            boolean isHighSeverity = HIGH_SEVERITY.equals(severity) || CRITICAL_SEVERITY.equals(severity);
             
             for (User user : users) {
                 // Skip users without location data
@@ -210,6 +235,7 @@ public class WeatherScheduler {
                 
                 // If user is within 20km of alert, create UserAlert
                 if (distance < ALERT_DISTANCE_THRESHOLD_KM) {
+                    // Create UserAlert entry
                     UserAlert userAlert = UserAlert.builder()
                             .userEmail(user.getEmail())
                             .alertMessage(weatherAlert.getMessage())
@@ -221,6 +247,25 @@ public class WeatherScheduler {
                     userAlertRepository.save(userAlert);
                     userAlertCount++;
                     
+                    // STEP 11B: Auto-create SOS for HIGH severity alerts
+                    if (isHighSeverity) {
+                        SosRequest autoSos = SosRequest.builder()
+                                .userEmail(user.getEmail())
+                                .latitude(user.getLatitude())
+                                .longitude(user.getLongitude())
+                                .message("AUTO-SOS: Severe weather danger in your area")
+                                .type(weatherAlert.getType()) // Use alert type (flood, storm, wildfire_risk, etc.)
+                                .status("PENDING")
+                                .timestamp(LocalDateTime.now())
+                                .build();
+                        
+                        sosRepository.save(autoSos);
+                        autoSosCount++;
+                        
+                        System.out.println("  🚨 Auto-SOS created for user: " + user.getEmail() + 
+                                " (Severity: " + weatherAlert.getSeverity() + ")");
+                    }
+                    
                     // Optionally: Send email/SMS notification here in the future
                 }
             }
@@ -229,7 +274,7 @@ public class WeatherScheduler {
             e.printStackTrace();
         }
         
-        return userAlertCount;
+        return new int[]{userAlertCount, autoSosCount};
     }
 
     /**
