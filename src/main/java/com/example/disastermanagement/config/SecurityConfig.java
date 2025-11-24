@@ -28,9 +28,11 @@ public class SecurityConfig {
                         // PUBLIC
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/debug/public").permitAll()
+                        .requestMatchers("/debug/run-weather-check").permitAll() // Temporary debug endpoint
                         .requestMatchers("/alerts/latest").permitAll()
                         .requestMatchers("/alerts/near").permitAll()
                         .requestMatchers("/alerts/recent").permitAll() // User accessible - recent alerts
+                        .requestMatchers("/alerts/my").hasAnyAuthority("USER", "ADMIN") // User's personal alerts
                         .requestMatchers("/resources/**").permitAll()
                         .requestMatchers("/weather/**").permitAll()
 

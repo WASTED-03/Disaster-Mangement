@@ -1,7 +1,11 @@
 package com.example.disastermanagement.service;
 
+import com.example.disastermanagement.model.User;
+import com.example.disastermanagement.model.UserAlert;
 import com.example.disastermanagement.model.WeatherAlert;
 import com.example.disastermanagement.model.WeatherData;
+import com.example.disastermanagement.repository.UserAlertRepository;
+import com.example.disastermanagement.repository.UserRepository;
 import com.example.disastermanagement.repository.WeatherAlertRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -20,18 +24,28 @@ public class WeatherScheduler {
     private final WeatherAlertService weatherAlertService;
     private final AlertRulesService alertRulesService;
     private final WeatherAlertRepository weatherAlertRepository;
+    private final UserRepository userRepository;
+    private final UserAlertRepository userAlertRepository;
 
     // Hardcoded location: Bengaluru, India
     private static final double BENGALURU_LAT = 12.97;
     private static final double BENGALURU_LON = 77.59;
     private static final String LOCATION_NAME = "Bengaluru";
+    
+    // Distance threshold for user alerts (in kilometers)
+    private static final double ALERT_DISTANCE_THRESHOLD_KM = 20.0;
+    private static final double EARTH_RADIUS_KM = 6371.0;
 
     public WeatherScheduler(WeatherAlertService weatherAlertService, 
                            AlertRulesService alertRulesService,
-                           WeatherAlertRepository weatherAlertRepository) {
+                           WeatherAlertRepository weatherAlertRepository,
+                           UserRepository userRepository,
+                           UserAlertRepository userAlertRepository) {
         this.weatherAlertService = weatherAlertService;
         this.alertRulesService = alertRulesService;
         this.weatherAlertRepository = weatherAlertRepository;
+        this.userRepository = userRepository;
+        this.userAlertRepository = userAlertRepository;
     }
 
     /**
@@ -59,13 +73,17 @@ public class WeatherScheduler {
                 System.out.println("\n[WEATHER ALERT] ⚠️  THREATS DETECTED at " + LOCATION_NAME + ":");
                 
                 int savedCount = 0;
+                int userAlertCount = 0;
                 for (String alertType : alerts) {
                     System.out.println("  - " + alertType);
                     
                     // Convert alert string to WeatherAlert entity and save
                     WeatherAlert weatherAlert = createWeatherAlert(alertType, weatherData, LOCATION_NAME);
-                    weatherAlertRepository.save(weatherAlert);
+                    WeatherAlert savedAlert = weatherAlertRepository.save(weatherAlert);
                     savedCount++;
+                    
+                    // STEP 10E: Match alert with nearby users and save to UserAlert
+                    userAlertCount += matchAlertWithUsers(savedAlert);
                 }
                 
                 System.out.println("Weather conditions: " + 
@@ -76,6 +94,9 @@ public class WeatherScheduler {
                 
                 String saveTimestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
                 System.out.println("💾 Saved " + savedCount + " new alert(s) at " + saveTimestamp);
+                if (userAlertCount > 0) {
+                    System.out.println("👤 Created " + userAlertCount + " user-specific alert(s) for nearby users");
+                }
             } else {
                 System.out.println("[WEATHER ALERT] ✅ No threats detected at " + LOCATION_NAME + 
                         ". Weather conditions are normal.");
@@ -157,6 +178,80 @@ public class WeatherScheduler {
         }
         
         return baseMessage;
+    }
+
+    /**
+     * STEP 10E: Match weather alert with nearby users and create UserAlert entries.
+     * 
+     * For each user with location data, calculates distance from alert location.
+     * If distance < 20km, creates a UserAlert entry for that user.
+     * 
+     * @param weatherAlert The weather alert to match with users
+     * @return Number of user alerts created
+     */
+    private int matchAlertWithUsers(WeatherAlert weatherAlert) {
+        int userAlertCount = 0;
+        
+        try {
+            // Get all users from database
+            List<User> users = userRepository.findAll();
+            
+            for (User user : users) {
+                // Skip users without location data
+                if (user.getLatitude() == null || user.getLongitude() == null) {
+                    continue;
+                }
+                
+                // Calculate distance between alert location and user location
+                double distance = calculateDistance(
+                        weatherAlert.getLatitude(), weatherAlert.getLongitude(),
+                        user.getLatitude(), user.getLongitude()
+                );
+                
+                // If user is within 20km of alert, create UserAlert
+                if (distance < ALERT_DISTANCE_THRESHOLD_KM) {
+                    UserAlert userAlert = UserAlert.builder()
+                            .userEmail(user.getEmail())
+                            .alertMessage(weatherAlert.getMessage())
+                            .type(weatherAlert.getType())
+                            .severity(weatherAlert.getSeverity())
+                            .timestamp(LocalDateTime.now())
+                            .build();
+                    
+                    userAlertRepository.save(userAlert);
+                    userAlertCount++;
+                    
+                    // Optionally: Send email/SMS notification here in the future
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[WEATHER SCHEDULER] Error matching alert with users: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        return userAlertCount;
+    }
+
+    /**
+     * Calculate distance between two points using Haversine formula.
+     * 
+     * @param lat1 Latitude of first point
+     * @param lon1 Longitude of first point
+     * @param lat2 Latitude of second point
+     * @param lon2 Longitude of second point
+     * @return Distance in kilometers
+     */
+    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                   Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                   Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return EARTH_RADIUS_KM * c;
     }
 }
 
