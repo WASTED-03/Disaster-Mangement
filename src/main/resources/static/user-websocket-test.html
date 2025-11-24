@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User WebSocket Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #2196F3;
+            padding-bottom: 10px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #2196F3;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0b7dda;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .disconnect-btn {
+            background-color: #f44336;
+        }
+        .disconnect-btn:hover {
+            background-color: #da190b;
+        }
+        .test-btn {
+            background-color: #FF9800;
+        }
+        .test-btn:hover {
+            background-color: #e68900;
+        }
+        #messages {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .message {
+            padding: 8px;
+            margin: 5px 0;
+            background-color: white;
+            border-left: 4px solid #2196F3;
+            border-radius: 2px;
+        }
+        .timestamp {
+            color: #666;
+            font-size: 12px;
+        }
+        .info {
+            background-color: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            border-left: 4px solid #2196F3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>👤 User WebSocket Test</h1>
+        <p>This page tests real-time user notifications via WebSocket.</p>
+        
+        <div class="info">
+            <strong>Instructions:</strong><br>
+            1. Enter your email address<br>
+            2. Click "Connect to WebSocket"<br>
+            3. Create an SOS request (via API or trigger weather alert)<br>
+            4. Watch for notifications in real-time
+        </div>
+        
+        <div>
+            <label for="userEmail">Your Email:</label>
+            <input type="email" id="userEmail" placeholder="user@example.com" value="user@example.com">
+        </div>
+        
+        <div>
+            <label for="jwtToken">JWT Token:</label>
+            <input type="text" id="jwtToken" placeholder="Enter your JWT token" style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+        </div>
+        
+        <div id="status" class="status disconnected">Disconnected</div>
+        
+        <div>
+            <button id="connectBtn" onclick="connect()">Connect to WebSocket</button>
+            <button id="disconnectBtn" class="disconnect-btn" onclick="disconnect()" disabled>Disconnect</button>
+        </div>
+        
+        <h3>Notifications Received:</h3>
+        <div id="messages"></div>
+    </div>
+
+    <script>
+        let stompClient = null;
+        const wsUrl = 'http://localhost:8080/ws';
+        let userTopic = null;
+
+        function connect() {
+            const email = document.getElementById('userEmail').value.trim();
+            const token = document.getElementById('jwtToken').value.trim();
+            
+            if (!email) {
+                alert('Please enter your email address');
+                return;
+            }
+            
+            if (!token) {
+                alert('Please enter your JWT token');
+                return;
+            }
+            
+            console.log('Connecting to WebSocket for user: ' + email);
+            
+            // Create user-specific topic
+            userTopic = '/topic/user/' + email;
+            
+            // Create SockJS connection with token as query parameter
+            const socket = new SockJS(wsUrl + '?token=' + encodeURIComponent(token));
+            stompClient = Stomp.over(socket);
+            
+            // Disable debug logging (set to true for debugging)
+            stompClient.debug = null;
+            
+            // Connect to WebSocket
+            stompClient.connect({}, function(frame) {
+                console.log('Connected: ' + frame);
+                updateStatus(true, email);
+                
+                // Subscribe to user-specific notifications
+                stompClient.subscribe(userTopic, function(message) {
+                    const notification = message.body;
+                    addMessage('User Notification', notification);
+                });
+                
+                addMessage('System', `Connected and subscribed to ${userTopic}`);
+                addMessage('System', 'To test: Create an SOS request or trigger a weather alert for this user');
+            }, function(error) {
+                console.error('Connection error: ' + error);
+                updateStatus(false, email);
+                addMessage('Error', 'Failed to connect: ' + error);
+            });
+        }
+
+        function disconnect() {
+            if (stompClient !== null) {
+                stompClient.disconnect();
+                stompClient = null;
+                userTopic = null;
+                updateStatus(false, '');
+                addMessage('System', 'Disconnected from WebSocket');
+            }
+        }
+
+        function updateStatus(connected, email) {
+            const statusDiv = document.getElementById('status');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const emailInput = document.getElementById('userEmail');
+            const tokenInput = document.getElementById('jwtToken');
+            
+            if (connected) {
+                statusDiv.textContent = `✅ Connected - Listening for notifications for: ${email}`;
+                statusDiv.className = 'status connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                emailInput.disabled = true;
+                tokenInput.disabled = true;
+            } else {
+                statusDiv.textContent = '❌ Disconnected';
+                statusDiv.className = 'status disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                emailInput.disabled = false;
+                tokenInput.disabled = false;
+            }
+        }
+
+        function addMessage(type, content) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            
+            const timestamp = new Date().toLocaleTimeString();
+            const contentText = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+            
+            messageDiv.innerHTML = `
+                <div><strong>${type}:</strong> ${contentText}</div>
+                <div class="timestamp">${timestamp}</div>
+            `;
+            
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // Auto-connect on page load (optional)
+        window.onload = function() {
+            addMessage('System', 'Page loaded. Enter your email and JWT token, then click "Connect to WebSocket" to start listening for notifications.');
+        };
+    </script>
+</body>
+</html>
+

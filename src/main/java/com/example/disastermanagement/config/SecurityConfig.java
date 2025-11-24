@@ -29,6 +29,7 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/debug/public").permitAll()
                         .requestMatchers("/debug/run-weather-check").permitAll() // Temporary debug endpoint
+                        .requestMatchers("/*.html").permitAll() // Allow HTML test pages
                         .requestMatchers("/alerts/latest").permitAll()
                         .requestMatchers("/alerts/near").permitAll()
                         .requestMatchers("/alerts/recent").permitAll() // User accessible - recent alerts
@@ -46,6 +47,8 @@ public class SecurityConfig {
                         .requestMatchers("/reports/{id}").hasAnyAuthority("USER", "ADMIN")
                         // USER LOCATION ENDPOINTS
                         .requestMatchers("/user/update-location").hasAnyAuthority("USER", "ADMIN")
+                        // USER FCM TOKEN ENDPOINTS
+                        .requestMatchers("/user/fcm/**").hasAnyAuthority("USER", "ADMIN")
 
                         // ADMIN PROMOTION (authenticated users can request promotion)
                         .requestMatchers("/admin/promote").authenticated()

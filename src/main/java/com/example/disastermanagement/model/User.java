@@ -41,6 +41,10 @@ public class User {
     private Double latitude;
     private Double longitude;
 
+    // FCM token for push notifications (Android/iOS)
+    @Column(length = 500)
+    private String fcmToken;
+
     public Set<String> getRoleSet() {
         if (roles == null || roles.isBlank()) return Collections.emptySet();
         return Arrays.stream(roles.split(","))
