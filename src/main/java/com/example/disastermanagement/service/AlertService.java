@@ -7,7 +7,6 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -63,7 +62,9 @@ public class AlertService {
                     alert.getTimestamp().toString(),
                     alert.getSource(),
                     alert.getId());
-            webSocketNotificationService.notifyAdmins(jsonMessage);
+
+            // Broadcast to location-specific topic if location is available
+            webSocketNotificationService.notifyAdmins(jsonMessage, alert.getLocation());
         } catch (Exception e) {
             System.err.println("Error broadcasting alert: " + e.getMessage());
         }
@@ -89,6 +90,50 @@ public class AlertService {
                 })
                 .sorted((a1, a2) -> a2.getTimestamp().compareTo(a1.getTimestamp())) // Most recent first
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Get alerts with filtering and pagination.
+     */
+    public org.springframework.data.domain.Page<Alert> getAlerts(
+            com.example.disastermanagement.dto.AlertFilterCriteria criteria,
+            org.springframework.data.domain.Pageable pageable) {
+        return repository.findAll((root, query, cb) -> {
+            java.util.List<jakarta.persistence.criteria.Predicate> predicates = new java.util.ArrayList<>();
+
+            if (criteria.getAlertType() != null) {
+                predicates.add(cb.equal(root.get("alertType"), criteria.getAlertType()));
+            }
+            if (criteria.getSeverity() != null) {
+                predicates.add(cb.equal(root.get("severity"), criteria.getSeverity()));
+            }
+            if (StringUtils.hasText(criteria.getLocation())) {
+                predicates
+                        .add(cb.like(cb.lower(root.get("location")), "%" + criteria.getLocation().toLowerCase() + "%"));
+            }
+            if (criteria.getStartDate() != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("timestamp"), criteria.getStartDate()));
+            }
+            if (criteria.getEndDate() != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("timestamp"), criteria.getEndDate()));
+            }
+            if (criteria.getAcknowledged() != null) {
+                predicates.add(cb.equal(root.get("acknowledged"), criteria.getAcknowledged()));
+            }
+
+            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        }, pageable);
+    }
+
+    /**
+     * Acknowledge an alert.
+     */
+    public Alert acknowledgeAlert(Long alertId) {
+        Alert alert = repository.findById(alertId)
+                .orElseThrow(() -> new RuntimeException("Alert not found with id: " + alertId));
+
+        alert.setAcknowledged(true);
+        return repository.save(alert);
     }
 
     /**

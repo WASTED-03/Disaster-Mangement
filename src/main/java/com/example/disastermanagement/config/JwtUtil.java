@@ -19,9 +19,12 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String generateToken(String email, Set<String> roles) {
+    public String generateToken(String email, Set<String> roles, String city) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("roles", roles);
+        if (city != null) {
+            claims.put("city", city);
+        }
         Date now = new Date();
         Date exp = new Date(System.currentTimeMillis() + 3600_000); // 1 hour
         return Jwts.builder()
@@ -48,6 +51,10 @@ public class JwtUtil {
     // convenience: returns as List<String>
     public List<String> extractRoles(String token) {
         return extractRolesList(token);
+    }
+
+    public String extractCity(String token) {
+        return (String) parseClaims(token).get("city");
     }
 
     public boolean validateToken(String token, String username) {

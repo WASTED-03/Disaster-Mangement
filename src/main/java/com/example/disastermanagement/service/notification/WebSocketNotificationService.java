@@ -18,7 +18,7 @@ public class WebSocketNotificationService implements NotificationService {
     private final NotificationLogRepository notificationLogRepository;
 
     // Topic destinations
-    private static final String TOPIC_ADMINS = "/topic/admin/alerts";
+    private static final String TOPIC_ADMIN_ALERTS_BASE = "/topic/admin/alerts";
     private static final String TOPIC_USER_PREFIX = "/topic/user/";
     private static final String TOPIC_GLOBAL = "/topic/global";
 
@@ -64,14 +64,36 @@ public class WebSocketNotificationService implements NotificationService {
 
     /**
      * Send a notification to all admin users.
-     * Message is sent to /topic/admins
+     * Message is sent to /topic/admin/alerts (global)
      * 
      * @param message The notification message to send
      */
     @Override
     public void notifyAdmins(String message) {
+        notifyAdmins(message, null);
+    }
+
+    /**
+     * Send a notification to admin users, optionally scoped by location.
+     * Message is sent to /topic/admin/alerts/{location} or
+     * /topic/admin/alerts/global
+     * 
+     * @param message  The notification message to send
+     * @param location The location scope (e.g., "Bengaluru"), or null for global
+     */
+    public void notifyAdmins(String message, String location) {
         try {
-            messagingTemplate.convertAndSend(TOPIC_ADMINS, message);
+            String destination;
+            if (location != null && !location.isBlank()) {
+                // Sanitize location: Trim, Uppercase, Replace spaces with underscores
+                // e.g. "New York " -> "NEW_YORK"
+                String safeLocation = location.trim().toUpperCase().replace(" ", "_");
+                destination = "/topic/admin/alerts/" + safeLocation;
+            } else {
+                destination = "/topic/admin/alerts/GLOBAL";
+            }
+
+            messagingTemplate.convertAndSend(destination, message);
 
             // Log notification (null email = admin broadcast)
             logNotification(null, TYPE_ADMIN, message, CHANNEL_WEBSOCKET, true, null);

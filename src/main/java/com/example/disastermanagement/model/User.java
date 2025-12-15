@@ -38,6 +38,8 @@ public class User {
     private boolean verified = false;
 
     // Location fields for location-based alerts
+    private String city;
+    private String state;
     private Double latitude;
     private Double longitude;
 
@@ -46,7 +48,8 @@ public class User {
     private String fcmToken;
 
     public Set<String> getRoleSet() {
-        if (roles == null || roles.isBlank()) return Collections.emptySet();
+        if (roles == null || roles.isBlank())
+            return Collections.emptySet();
         return Arrays.stream(roles.split(","))
                 .map(String::trim)
                 .collect(Collectors.toSet());

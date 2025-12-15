@@ -21,9 +21,9 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
 
     public AuthController(UserRepository userRepo,
-                          OtpService otpService,
-                          JwtUtil jwtUtil,
-                          PasswordEncoder passwordEncoder) {
+            OtpService otpService,
+            JwtUtil jwtUtil,
+            PasswordEncoder passwordEncoder) {
         this.userRepo = userRepo;
         this.otpService = otpService;
         this.jwtUtil = jwtUtil;
@@ -33,7 +33,12 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody Map<String, String> body) {
         String email = body.get("email");
-        String rawPassword = body.get("password");
+        String name = body.get("name");
+        String city = body.get("city");
+        String state = body.get("state");
+        // Password is not used for login (OTP based), but we set a dummy one or keep it
+        // if provided
+        String rawPassword = body.getOrDefault("password", java.util.UUID.randomUUID().toString());
 
         if (userRepo.findByEmail(email).isPresent()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Email already registered"));
@@ -41,6 +46,9 @@ public class AuthController {
 
         User u = User.builder()
                 .email(email)
+                .name(name)
+                .city(city)
+                .state(state)
                 .password(passwordEncoder.encode(rawPassword))
                 .roles("USER")
                 .verified(false)
@@ -66,10 +74,11 @@ public class AuthController {
         String otp = body.get("otp");
 
         boolean ok = otpService.verifyOtp(email, otp);
-        if (!ok) return ResponseEntity.badRequest().body(Map.of("error", "Invalid or expired OTP"));
+        if (!ok)
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid or expired OTP"));
 
         User user = userRepo.findByEmail(email).get();
-        String token = jwtUtil.generateToken(user.getEmail(), user.getRoleSet());
+        String token = jwtUtil.generateToken(user.getEmail(), user.getRoleSet(), user.getCity());
         return ResponseEntity.ok(Map.of("message", "OTP verified successfully", "token", token));
     }
 }
