@@ -18,20 +18,20 @@ public class WebSocketNotificationService implements NotificationService {
     private final NotificationLogRepository notificationLogRepository;
 
     // Topic destinations
-    private static final String TOPIC_ADMINS = "/topic/admins";
+    private static final String TOPIC_ADMINS = "/topic/admin/alerts";
     private static final String TOPIC_USER_PREFIX = "/topic/user/";
     private static final String TOPIC_GLOBAL = "/topic/global";
-    
+
     // Notification types
     private static final String TYPE_USER = "USER";
     private static final String TYPE_ADMIN = "ADMIN";
     private static final String TYPE_BROADCAST = "BROADCAST";
-    
+
     // Channel type
     private static final String CHANNEL_WEBSOCKET = "WEBSOCKET";
 
     public WebSocketNotificationService(SimpMessagingTemplate messagingTemplate,
-                                       NotificationLogRepository notificationLogRepository) {
+            NotificationLogRepository notificationLogRepository) {
         this.messagingTemplate = messagingTemplate;
         this.notificationLogRepository = notificationLogRepository;
     }
@@ -40,7 +40,7 @@ public class WebSocketNotificationService implements NotificationService {
      * Send a notification to a specific user by email.
      * Message is sent to /topic/user/{email}
      * 
-     * @param email The email address of the user to notify
+     * @param email   The email address of the user to notify
      * @param message The notification message to send
      */
     @Override
@@ -48,11 +48,11 @@ public class WebSocketNotificationService implements NotificationService {
         if (email == null || email.isBlank()) {
             return;
         }
-        
+
         try {
             String destination = TOPIC_USER_PREFIX + email;
             messagingTemplate.convertAndSend(destination, message);
-            
+
             // Log notification
             logNotification(email, TYPE_USER, message, CHANNEL_WEBSOCKET, true, null);
         } catch (Exception e) {
@@ -72,7 +72,7 @@ public class WebSocketNotificationService implements NotificationService {
     public void notifyAdmins(String message) {
         try {
             messagingTemplate.convertAndSend(TOPIC_ADMINS, message);
-            
+
             // Log notification (null email = admin broadcast)
             logNotification(null, TYPE_ADMIN, message, CHANNEL_WEBSOCKET, true, null);
         } catch (Exception e) {
@@ -92,7 +92,7 @@ public class WebSocketNotificationService implements NotificationService {
     public void notifyAll(String message) {
         try {
             messagingTemplate.convertAndSend(TOPIC_GLOBAL, message);
-            
+
             // Log notification (null email = broadcast)
             logNotification(null, TYPE_BROADCAST, message, CHANNEL_WEBSOCKET, true, null);
         } catch (Exception e) {
@@ -105,15 +105,17 @@ public class WebSocketNotificationService implements NotificationService {
     /**
      * Log notification to database for audit and history.
      * 
-     * @param recipientEmail The recipient email (null for broadcast/admin notifications)
-     * @param type The notification type (USER, ADMIN, BROADCAST)
-     * @param message The notification message
-     * @param channel The channel used (WEBSOCKET, EMAIL, SMS, PUSH)
-     * @param sent Whether the notification was sent successfully
-     * @param errorMessage Error message if notification failed (null if successful)
+     * @param recipientEmail The recipient email (null for broadcast/admin
+     *                       notifications)
+     * @param type           The notification type (USER, ADMIN, BROADCAST)
+     * @param message        The notification message
+     * @param channel        The channel used (WEBSOCKET, EMAIL, SMS, PUSH)
+     * @param sent           Whether the notification was sent successfully
+     * @param errorMessage   Error message if notification failed (null if
+     *                       successful)
      */
-    private void logNotification(String recipientEmail, String type, String message, 
-                                String channel, boolean sent, String errorMessage) {
+    private void logNotification(String recipientEmail, String type, String message,
+            String channel, boolean sent, String errorMessage) {
         try {
             NotificationLog log = NotificationLog.builder()
                     .recipientEmail(recipientEmail)
@@ -124,7 +126,7 @@ public class WebSocketNotificationService implements NotificationService {
                     .sent(sent)
                     .errorMessage(errorMessage)
                     .build();
-            
+
             notificationLogRepository.save(log);
         } catch (Exception e) {
             // Don't fail notification sending if logging fails
@@ -132,4 +134,3 @@ public class WebSocketNotificationService implements NotificationService {
         }
     }
 }
-
