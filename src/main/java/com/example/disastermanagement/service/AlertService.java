@@ -13,38 +13,60 @@ import java.util.stream.Collectors;
 @Service
 public class AlertService {
 
-    private static final Set<String> ALLOWED_SEVERITIES = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
     private static final double EARTH_RADIUS_KM = 6371.0;
     private static final double DEFAULT_RADIUS_KM = 50.0; // Default radius for "near me" alerts
 
     private final AlertRepository repository;
+    private final com.example.disastermanagement.service.notification.WebSocketNotificationService webSocketNotificationService;
 
-    public AlertService(AlertRepository repository) {
+    public AlertService(AlertRepository repository,
+            com.example.disastermanagement.service.notification.WebSocketNotificationService webSocketNotificationService) {
         this.repository = repository;
+        this.webSocketNotificationService = webSocketNotificationService;
     }
 
     public Alert createAlert(Alert alert) {
-        if (!StringUtils.hasText(alert.getTitle())) {
-            throw new IllegalArgumentException("Title is required");
+        if (alert.getAlertType() == null) {
+            throw new IllegalArgumentException("Alert Type is required");
+        }
+        if (alert.getSeverity() == null) {
+            throw new IllegalArgumentException("Severity is required");
         }
         if (!StringUtils.hasText(alert.getMessage())) {
             throw new IllegalArgumentException("Message is required");
         }
-        if (!StringUtils.hasText(alert.getSeverity())) {
-            throw new IllegalArgumentException("Severity is required");
-        }
 
-        String severity = alert.getSeverity().toUpperCase();
-        if (!ALLOWED_SEVERITIES.contains(severity)) {
-            throw new IllegalArgumentException("Severity must be LOW, MEDIUM, HIGH, or CRITICAL");
-        }
-
-        alert.setSeverity(severity);
         if (alert.getTimestamp() == null) {
             alert.setTimestamp(LocalDateTime.now());
         }
 
-        return repository.save(alert);
+        // 1. Save to DB
+        Alert savedAlert = repository.save(alert);
+
+        // 2. Broadcast via WebSocket
+        broadcastAlert(savedAlert);
+
+        return savedAlert;
+    }
+
+    private void broadcastAlert(Alert alert) {
+        try {
+            // Construct JSON message matching the format used in WeatherScheduler
+            // {"type": "WEATHER_ALERT", "alertType": "...", "severity": "...", "location":
+            // "...", "message": "...", "timestamp": "..."}
+            String jsonMessage = String.format(
+                    "{\"type\": \"ALERT\", \"alertType\": \"%s\", \"severity\": \"%s\", \"location\": \"%s\", \"message\": \"%s\", \"timestamp\": \"%s\", \"source\": \"%s\", \"id\": %d}",
+                    alert.getAlertType(),
+                    alert.getSeverity(),
+                    alert.getLocation() != null ? alert.getLocation() : "Unknown",
+                    alert.getMessage(),
+                    alert.getTimestamp().toString(),
+                    alert.getSource(),
+                    alert.getId());
+            webSocketNotificationService.notifyAdmins(jsonMessage);
+        } catch (Exception e) {
+            System.err.println("Error broadcasting alert: " + e.getMessage());
+        }
     }
 
     public List<Alert> getLatestAlerts() {
@@ -57,13 +79,12 @@ public class AlertService {
 
     public List<Alert> getAlertsNear(double latitude, double longitude, double radiusKm) {
         List<Alert> allAlerts = repository.findAll();
-        
+
         return allAlerts.stream()
                 .filter(alert -> {
                     double distance = calculateDistance(
                             latitude, longitude,
-                            alert.getLatitude(), alert.getLongitude()
-                    );
+                            alert.getLatitude(), alert.getLongitude());
                     return distance <= radiusKm;
                 })
                 .sorted((a1, a2) -> a2.getTimestamp().compareTo(a1.getTimestamp())) // Most recent first
@@ -72,6 +93,7 @@ public class AlertService {
 
     /**
      * Calculate distance between two points using Haversine formula
+     * 
      * @param lat1 Latitude of first point
      * @param lon1 Longitude of first point
      * @param lat2 Latitude of second point
@@ -83,12 +105,11 @@ public class AlertService {
         double dLon = Math.toRadians(lon2 - lon1);
 
         double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                   Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                   Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                        Math.sin(dLon / 2) * Math.sin(dLon / 2);
 
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
         return EARTH_RADIUS_KM * c;
     }
 }
-

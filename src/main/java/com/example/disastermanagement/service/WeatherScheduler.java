@@ -3,12 +3,10 @@ package com.example.disastermanagement.service;
 import com.example.disastermanagement.model.SosRequest;
 import com.example.disastermanagement.model.User;
 import com.example.disastermanagement.model.UserAlert;
-import com.example.disastermanagement.model.WeatherAlert;
 import com.example.disastermanagement.model.WeatherData;
 import com.example.disastermanagement.repository.SosRepository;
 import com.example.disastermanagement.repository.UserAlertRepository;
 import com.example.disastermanagement.repository.UserRepository;
-import com.example.disastermanagement.repository.WeatherAlertRepository;
 import com.example.disastermanagement.service.notification.NotificationService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -26,7 +24,7 @@ public class WeatherScheduler {
 
     private final WeatherAlertService weatherAlertService;
     private final AlertRulesService alertRulesService;
-    private final WeatherAlertRepository weatherAlertRepository;
+    private final AlertService alertService;
     private final UserRepository userRepository;
     private final UserAlertRepository userAlertRepository;
     private final SosRepository sosRepository;
@@ -50,14 +48,14 @@ public class WeatherScheduler {
 
     public WeatherScheduler(WeatherAlertService weatherAlertService,
             AlertRulesService alertRulesService,
-            WeatherAlertRepository weatherAlertRepository,
+            AlertService alertService,
             UserRepository userRepository,
             UserAlertRepository userAlertRepository,
             SosRepository sosRepository,
             NotificationService notificationService) {
         this.weatherAlertService = weatherAlertService;
         this.alertRulesService = alertRulesService;
-        this.weatherAlertRepository = weatherAlertRepository;
+        this.alertService = alertService;
         this.userRepository = userRepository;
         this.userAlertRepository = userAlertRepository;
         this.sosRepository = sosRepository;
@@ -91,12 +89,14 @@ public class WeatherScheduler {
                 int savedCount = 0;
                 int userAlertCount = 0;
                 int autoSosCount = 0;
-                for (String alertType : alerts) {
-                    System.out.println("  - " + alertType);
+                for (String alertTypeStr : alerts) {
+                    System.out.println("  - " + alertTypeStr);
 
-                    // Convert alert string to WeatherAlert entity and save
-                    WeatherAlert weatherAlert = createWeatherAlert(alertType, weatherData, LOCATION_NAME);
-                    WeatherAlert savedAlert = weatherAlertRepository.save(weatherAlert);
+                    // Convert alert string to Alert entity and save via AlertService
+                    // This handles saving and broadcasting
+                    com.example.disastermanagement.model.Alert alert = createAlert(alertTypeStr, weatherData,
+                            LOCATION_NAME);
+                    com.example.disastermanagement.model.Alert savedAlert = alertService.createAlert(alert);
                     savedCount++;
 
                     // STEP 10E: Match alert with nearby users and save to UserAlert
@@ -138,25 +138,21 @@ public class WeatherScheduler {
     }
 
     /**
-     * Helper method to create a WeatherAlert entity from alert type and weather
-     * data.
-     * 
-     * @param alertType    The type of alert (e.g., "FLOOD_RISK_HIGH",
-     *                     "CYCLONE_WARNING", "WILDFIRE_RISK_HIGH")
-     * @param weatherData  The weather data that triggered the alert
-     * @param locationName The name of the location
-     * @return WeatherAlert entity ready to be saved
+     * Helper method to create an Alert entity from alert type and weather data.
      */
-    private WeatherAlert createWeatherAlert(String alertType, WeatherData weatherData, String locationName) {
+    private com.example.disastermanagement.model.Alert createAlert(String alertTypeStr, WeatherData weatherData,
+            String locationName) {
         // Determine alert type and severity from alert string
-        String type = extractAlertType(alertType);
-        String severity = extractSeverity(alertType);
-        String message = generateAlertMessage(alertType, locationName, weatherData);
+        com.example.disastermanagement.model.enums.AlertType type = extractAlertType(alertTypeStr);
+        com.example.disastermanagement.model.enums.AlertSeverity severity = extractSeverity(alertTypeStr);
+        String message = generateAlertMessage(alertTypeStr, locationName, weatherData);
 
-        return WeatherAlert.builder()
+        return com.example.disastermanagement.model.Alert.builder()
                 .message(message)
-                .type(type)
+                .alertType(type)
                 .severity(severity)
+                .location(locationName)
+                .source(com.example.disastermanagement.model.enums.AlertSource.RULE_ENGINE)
                 .timestamp(LocalDateTime.now())
                 .latitude(BENGALURU_LAT)
                 .longitude(BENGALURU_LON)
@@ -166,30 +162,30 @@ public class WeatherScheduler {
     /**
      * Extract alert type from alert string.
      */
-    private String extractAlertType(String alertType) {
+    private com.example.disastermanagement.model.enums.AlertType extractAlertType(String alertType) {
         if (alertType.contains("FLOOD")) {
-            return "flood";
+            return com.example.disastermanagement.model.enums.AlertType.FLOOD;
         } else if (alertType.contains("CYCLONE") || alertType.contains("STORM")) {
-            return "storm";
+            return com.example.disastermanagement.model.enums.AlertType.STORM;
         } else if (alertType.contains("WILDFIRE")) {
-            return "wildfire_risk";
+            return com.example.disastermanagement.model.enums.AlertType.WILDFIRE;
         } else {
-            return "other";
+            return com.example.disastermanagement.model.enums.AlertType.OTHER;
         }
     }
 
     /**
      * Extract severity from alert string.
      */
-    private String extractSeverity(String alertType) {
+    private com.example.disastermanagement.model.enums.AlertSeverity extractSeverity(String alertType) {
         if (alertType.contains("CRITICAL")) {
-            return "critical";
+            return com.example.disastermanagement.model.enums.AlertSeverity.CRITICAL;
         } else if (alertType.contains("HIGH") || alertType.contains("WARNING")) {
-            return "high";
+            return com.example.disastermanagement.model.enums.AlertSeverity.HIGH;
         } else if (alertType.contains("MEDIUM")) {
-            return "medium";
+            return com.example.disastermanagement.model.enums.AlertSeverity.MEDIUM;
         } else {
-            return "low";
+            return com.example.disastermanagement.model.enums.AlertSeverity.LOW;
         }
     }
 
@@ -211,19 +207,9 @@ public class WeatherScheduler {
     }
 
     /**
-     * STEP 10E & 11B: Match weather alert with nearby users and create UserAlert
-     * entries.
-     * Also creates auto-SOS requests for HIGH severity alerts.
-     * 
-     * For each user with location data, calculates distance from alert location.
-     * If distance < 20km:
-     * - Creates a UserAlert entry for that user
-     * - If alert severity is HIGH or CRITICAL, also creates an auto-SOS request
-     * 
-     * @param weatherAlert The weather alert to match with users
-     * @return Array with [userAlertCount, autoSosCount]
+     * Match alert with nearby users and create UserAlert entries.
      */
-    private int[] matchAlertWithUsers(WeatherAlert weatherAlert) {
+    private int[] matchAlertWithUsers(com.example.disastermanagement.model.Alert alert) {
         int userAlertCount = 0;
         int autoSosCount = 0;
 
@@ -231,26 +217,13 @@ public class WeatherScheduler {
             // Get all users from database
             List<User> users = userRepository.findAll();
 
-            // STEP 11A: Check if alert severity is HIGH (for auto-SOS)
-            String severity = weatherAlert.getSeverity() != null ? weatherAlert.getSeverity().toLowerCase() : "";
-            boolean isHighSeverity = HIGH_SEVERITY.equals(severity) || CRITICAL_SEVERITY.equals(severity);
+            // Check if alert severity is HIGH (for auto-SOS)
+            // Using Enum comparison
+            boolean isHighSeverity = alert
+                    .getSeverity() == com.example.disastermanagement.model.enums.AlertSeverity.HIGH ||
+                    alert.getSeverity() == com.example.disastermanagement.model.enums.AlertSeverity.CRITICAL;
 
-            // STEP 12.6: Notify admins about high-severity weather alert
-            if (isHighSeverity) {
-                try {
-                    // Construct JSON message for WebSocket broadcast
-                    String jsonMessage = String.format(
-                            "{\"type\": \"WEATHER_ALERT\", \"alertType\": \"%s\", \"severity\": \"%s\", \"location\": \"%s\", \"message\": \"%s\", \"timestamp\": \"%s\"}",
-                            weatherAlert.getType().toUpperCase(),
-                            weatherAlert.getSeverity().toUpperCase(),
-                            LOCATION_NAME,
-                            weatherAlert.getMessage(),
-                            LocalDateTime.now().toString());
-                    notificationService.notifyAdmins(jsonMessage);
-                } catch (Exception e) {
-                    System.err.println("Error sending admin notification: " + e.getMessage());
-                }
-            }
+            // Note: Admin notification is now handled by AlertService.createAlert()
 
             for (User user : users) {
                 // Skip users without location data
@@ -260,7 +233,7 @@ public class WeatherScheduler {
 
                 // Calculate distance between alert location and user location
                 double distance = calculateDistance(
-                        weatherAlert.getLatitude(), weatherAlert.getLongitude(),
+                        alert.getLatitude(), alert.getLongitude(),
                         user.getLatitude(), user.getLongitude());
 
                 // If user is within 20km of alert, create UserAlert
@@ -268,26 +241,25 @@ public class WeatherScheduler {
                     // Create UserAlert entry
                     UserAlert userAlert = UserAlert.builder()
                             .userEmail(user.getEmail())
-                            .alertMessage(weatherAlert.getMessage())
-                            .type(weatherAlert.getType())
-                            .severity(weatherAlert.getSeverity())
+                            .alertMessage(alert.getMessage())
+                            .type(alert.getAlertType().toString())
+                            .severity(alert.getSeverity().toString())
                             .timestamp(LocalDateTime.now())
                             .build();
 
                     userAlertRepository.save(userAlert);
                     userAlertCount++;
 
-                    // STEP 12.6: Send real-time notification to user about weather alert
+                    // Send real-time notification to user about weather alert
                     try {
                         String userMessage = String.format("Severe Weather Warning! %s - %s",
-                                weatherAlert.getType().toUpperCase(), weatherAlert.getMessage());
+                                alert.getAlertType(), alert.getMessage());
                         notificationService.notifyUser(user.getEmail(), userMessage);
                     } catch (Exception e) {
                         System.err.println("Error sending weather alert notification to user: " + e.getMessage());
                     }
 
-                    // STEP 11B: Auto-create SOS for HIGH severity alerts
-                    // STEP 11D: Check cooldown to prevent flood of SOS
+                    // Auto-create SOS for HIGH severity alerts
                     if (isHighSeverity) {
                         // Check if user already has an auto-SOS in the last 30 minutes
                         LocalDateTime cooldownThreshold = LocalDateTime.now().minusMinutes(AUTO_SOS_COOLDOWN_MINUTES);
@@ -302,17 +274,17 @@ public class WeatherScheduler {
                                     .latitude(user.getLatitude())
                                     .longitude(user.getLongitude())
                                     .message("AUTO-SOS: Severe weather danger in your area")
-                                    .type(weatherAlert.getType()) // Use alert type (flood, storm, wildfire_risk, etc.)
+                                    .type(alert.getAlertType().toString())
                                     .status("PENDING")
                                     .timestamp(LocalDateTime.now())
-                                    .autoGenerated(true) // STEP 11C: Mark as auto-generated
+                                    .autoGenerated(true)
                                     .build();
 
                             sosRepository.save(autoSos);
                             autoSosCount++;
 
                             System.out.println("  🚨 Auto-SOS created for user: " + user.getEmail() +
-                                    " (Severity: " + weatherAlert.getSeverity() + ")");
+                                    " (Severity: " + alert.getSeverity() + ")");
                         } else {
                             // Cooldown active - skip creating duplicate auto-SOS
                             System.out.println("  ⏸️  Auto-SOS skipped for user: " + user.getEmail() +
@@ -320,8 +292,6 @@ public class WeatherScheduler {
                                     recentAutoSos.get(0).getTimestamp() + ")");
                         }
                     }
-
-                    // Optionally: Send email/SMS notification here in the future
                 }
             }
         } catch (Exception e) {

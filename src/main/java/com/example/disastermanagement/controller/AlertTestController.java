@@ -1,6 +1,5 @@
 package com.example.disastermanagement.controller;
 
-import com.example.disastermanagement.service.notification.WebSocketNotificationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,36 +12,27 @@ import java.util.Map;
 @RequestMapping("/api/alert")
 public class AlertTestController {
 
-    private final WebSocketNotificationService webSocketNotificationService;
+    private final com.example.disastermanagement.service.AlertService alertService;
 
-    public AlertTestController(WebSocketNotificationService webSocketNotificationService) {
-        this.webSocketNotificationService = webSocketNotificationService;
+    public AlertTestController(com.example.disastermanagement.service.AlertService alertService) {
+        this.alertService = alertService;
     }
 
     @PostMapping("/test")
     public ResponseEntity<?> testAlert() {
-        // Create the JSON message structure as requested
-        // {
-        // "type": "TEST_ALERT",
-        // "message": "System working!",
-        // "time": "2025-11-21T12:40:00"
-        // }
+        // Create a test alert
+        com.example.disastermanagement.model.Alert alert = com.example.disastermanagement.model.Alert.builder()
+                .alertType(com.example.disastermanagement.model.enums.AlertType.TEST)
+                .severity(com.example.disastermanagement.model.enums.AlertSeverity.LOW)
+                .location("Test Location")
+                .message("System working!")
+                .source(com.example.disastermanagement.model.enums.AlertSource.MANUAL)
+                .timestamp(LocalDateTime.now())
+                .build();
 
-        // We need to send a JSON string because the service takes a String message.
-        // Ideally the service should take an object, but for now we'll construct a JSON
-        // string
-        // or if the service sends the string as is, we can send the JSON string.
+        // Save and broadcast via AlertService
+        alertService.createAlert(alert);
 
-        // However, looking at WebSocketNotificationService.notifyAdmins, it sends the
-        // string directly.
-        // If the client expects JSON, we should send a JSON string.
-
-        String jsonMessage = String.format(
-                "{\"type\": \"TEST_ALERT\", \"message\": \"System working!\", \"time\": \"%s\"}",
-                LocalDateTime.now().toString());
-
-        webSocketNotificationService.notifyAdmins(jsonMessage);
-
-        return ResponseEntity.ok(Map.of("status", "Test alert sent"));
+        return ResponseEntity.ok(Map.of("status", "Test alert created and broadcasted"));
     }
 }

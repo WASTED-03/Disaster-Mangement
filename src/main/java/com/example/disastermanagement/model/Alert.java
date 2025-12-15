@@ -17,13 +17,24 @@ public class Alert {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String title;
+    @Enumerated(EnumType.STRING)
+    private com.example.disastermanagement.model.enums.AlertType alertType;
+
+    @Enumerated(EnumType.STRING)
+    private com.example.disastermanagement.model.enums.AlertSeverity severity;
+
+    private String location;
     private String message;
-    private String severity; // LOW, MEDIUM, HIGH, CRITICAL
+
+    @Enumerated(EnumType.STRING)
+    private com.example.disastermanagement.model.enums.AlertSource source;
+
+    private boolean acknowledged = false;
+
+    // Keeping lat/long for geospatial features
     private double latitude;
     private double longitude;
-    
+
     @Builder.Default
     private LocalDateTime timestamp = LocalDateTime.now();
 }
-
