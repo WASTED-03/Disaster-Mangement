@@ -30,6 +30,7 @@ public class SecurityConfig {
                         .requestMatchers("/debug/public").permitAll()
                         .requestMatchers("/debug/run-weather-check").permitAll() // Temporary debug endpoint
                         .requestMatchers("/*.html").permitAll() // Allow HTML test pages
+                        .requestMatchers("/api/alert/test").permitAll() // Allow test alert endpoint
                         .requestMatchers("/alerts/latest").permitAll()
                         .requestMatchers("/alerts/near").permitAll()
                         .requestMatchers("/alerts/recent").permitAll() // User accessible - recent alerts
@@ -58,10 +59,8 @@ public class SecurityConfig {
                         .requestMatchers("/alerts/all").hasAuthority("ADMIN") // Admin only - all alerts
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
 
-
                         // OTHER
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
