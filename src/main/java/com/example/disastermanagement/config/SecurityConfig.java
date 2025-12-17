@@ -31,6 +31,7 @@ public class SecurityConfig {
                         .requestMatchers("/debug/run-weather-check").permitAll() // Temporary debug endpoint
                         .requestMatchers("/*.html").permitAll() // Allow HTML test pages
                         .requestMatchers("/api/alert/test").permitAll() // Allow test alert endpoint
+                        .requestMatchers("/api/alert/test-simple").permitAll() // Allow simple test alert endpoint
                         .requestMatchers("/alerts/latest").permitAll()
                         .requestMatchers("/alerts/near").permitAll()
                         .requestMatchers("/alerts/recent").permitAll() // User accessible - recent alerts

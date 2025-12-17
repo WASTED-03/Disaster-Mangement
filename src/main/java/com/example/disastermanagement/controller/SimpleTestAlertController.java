@@ -10,15 +10,15 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/alert")
-public class AlertTestController {
+public class SimpleTestAlertController {
 
     private final com.example.disastermanagement.service.AlertService alertService;
 
-    public AlertTestController(com.example.disastermanagement.service.AlertService alertService) {
+    public SimpleTestAlertController(com.example.disastermanagement.service.AlertService alertService) {
         this.alertService = alertService;
     }
 
-    @PostMapping("/test")
+    @PostMapping("/test-simple")
     public ResponseEntity<?> testAlert() {
         // Create a test alert
         com.example.disastermanagement.model.Alert alert = com.example.disastermanagement.model.Alert.builder()

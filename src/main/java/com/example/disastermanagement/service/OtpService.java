@@ -51,15 +51,18 @@ public class OtpService {
 
         var opt = otpRepo.findTopByEmailAndUsedFalseOrderByExpiresAtDesc(email);
 
-        if (opt.isEmpty()) return false;
+        if (opt.isEmpty())
+            return false;
 
         OtpToken token = opt.get();
 
         // Check expiration
-        if (token.getExpiresAt().isBefore(LocalDateTime.now())) return false;
+        if (token.getExpiresAt().isBefore(LocalDateTime.now()))
+            return false;
 
         // Check OTP match
-        if (!token.getOtp().equals(otp)) return false;
+        if (!token.getOtp().equals(otp))
+            return false;
 
         // Mark as used
         token.setUsed(true);
